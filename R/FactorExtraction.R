@@ -1,21 +1,3 @@
-#' @title Factor Extraction
-#' @description Extract factors from a data set of time series.
-#' @param x Vintage transformada pela função \code{arrumarVintage}
-#' @param q Dynamic rank. Number of error terms. If not specified q = 2.
-#' @param r Static rank (r>=q), i.e. number of factors. If not specified r = 2.
-#' @param p AR order of factors. If not specified p = 1.
-#' @param A Matrix that update factors with VAR
-#' @param C Matrix that combine factors to explain the transformed data.
-#' @param Q Error variance in factor update.
-#' @param R Error variance in explain data from factors
-#' @param initx Initial condition of factor in Kalman filter estimation.
-#' @param initV Initial condition of factor variance
-#' @param ss Standard deviation in transformed data.
-#' @param MM Mean in transformed data.
-#' @param n.prevs Number of quarter previsions ahead.
-
-
-
 FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL, 
                              A = NULL,C = NULL,Q = NULL,R = NULL,
                              initx = NULL, initV = NULL,
@@ -51,26 +33,23 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   coluna1 <- x[,1]
   x <- x[,-1]
   
-  # tamanho da base
+  # Base dimension
   TT <- nrow(x)
   N <- ncol(x)
   
-  # Construir o painel balanceado (sem missings) Z a partir de x (base de entrada)
-  # ignorar séries com mais de 1/3 de missings
-  
+  # Number of missings - Here the missings are only new information
   n.missings <- colSums(is.na(x))
   m <- max(n.missings)
   
-  # cálculo do número de argumentos fornecidos
+  # Number of arguments inputed
   n.arg <- sum(c(!is.null(x),!is.null(q),!is.null(r),!is.null(p),
                  !is.null(A),!is.null(C),!is.null(Q),!is.null(R),
                  !is.null(initx), !is.null(initV), 
                  !is.null(ss), !is.null(MM)))
   
-  if(n.arg < 5){ # estimar os parâmetros se eles não são fornecidos
+  if(n.arg < 5){ # Estimate parameters if they are not inputed
     
-    # padronizar a série balanceada para estimar os parâmetros no primeiro estágio (via PCA)
-    z <- x[1:(TT - m),]
+    z <- x[1:(TT - m),]      # ONLY complete information for PCA
     s <- apply(z, MARGIN = 2, FUN = sd)
     M <- apply(z, MARGIN = 2, FUN = mean)
     
@@ -87,10 +66,11 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
     R <- parametros$R
     initx <- parametros$initx
     initV <- parametros$initV
+    a <- parametros$eigen
     #print(A)
   }else{
     
-    # se os parâmetros são fornecidos, basta padronizar
+    # If parameters are inputed only need to standardize
     
     for(i in 1:N){
       x[,i] <- (x[,i] - MM[i])/ss[i]
@@ -99,7 +79,7 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
     
   }
   
-  # parâmetros pro modelo em espaço de estados
+  # Parameters for state space model
   
   AA <- array(A, dim = c(nrow(A), ncol(A), TT))
   QQ <- array(Q, dim = c(nrow(Q), ncol(Q), TT))
@@ -114,9 +94,9 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   }
   
   xx <- x
-  xx[is.na(x)] <- 0 # atribuir valor arbitrário para missing
+  xx[is.na(x)] <- 0 # Arbitrary value for missing
   
-  # FUNÇÃO KALMAN SMOOTHER DIAG
+  # KALMAN SMOOTHER DIAG
   
   resul <- kalman_smoother_diag(t(xx), AA, CC, QQ, RR, initx, initV, list('model',1:TT))
   
@@ -132,5 +112,12 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   nomes_colunas <- c("data", paste0("Fator",1:ncol(fatores)))
   fator_final <- data.frame(coluna1, fatores)
   colnames(fator_final) <- nomes_colunas
+  
+  x<-fator_final
+  fatoresTS <- stats::ts(x[,-1], end = as.numeric(c(substr(x[nrow(x),1],1,4),
+                                                    substr(x[nrow(x),1],6,7))), frequency = 12)
+  
+  
   fator_final
+  list(fator_final = fatoresTS,A = A,C = C,Q = Q,R =  R,initx =  initx,initV =  initV,eigen = a)
 }

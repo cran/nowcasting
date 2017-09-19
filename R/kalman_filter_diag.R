@@ -1,14 +1,3 @@
-#' @title Kalman Filter Diagonal
-#' @description Kalman Filter Diagonal
-#' @param y xxx
-#' @param A Matrix that update factors with VAR
-#' @param C Matrix that combine factors to explain the transformed data.
-#' @param Q Error variance in factor update.
-#' @param R Error variance in explain data from factors
-#' @param init_x xxx
-#' @param init_V xxx
-#' @param varagin xxx
-
 kalman_filter_diag <- function(y, A, C, Q, R, init_x, init_V, varagin){
   
   # y = t(xx);

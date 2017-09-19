@@ -1,11 +1,6 @@
-#' @title Principal Components to Dynamic Factor Model
-#' @description Estimates the first stage for dynamic factors on \emph{Giannone, Domenico, Lucrezia Reichlin, and David Small. "Nowcasting: The real-time informational content of macroeconomic data." Journal of Monetary Economics 55.4 (2008): 665-676}.
-#' @param x The \code{ts} used to extract the dynamic factors. 
-#' @param q Number of shocks in factors.
-#' @param r Number of factors.
-#' @param p Degree of autoregressive polynomial
 #' @import matlab
 #' @import corpcor
+
 
 
 pcatodfm <- function(x, q, r, p){
@@ -34,7 +29,7 @@ pcatodfm <- function(x, q, r, p){
   N <- ncol(x)
   
   # restrição
-  if(r < q){ stop("q precisa ser menor ou igual a r") }
+  if(r < q){ stop("q must be less than or equal to r") }
   
   # nlag 
   nlag <- p - 1
@@ -54,7 +49,8 @@ pcatodfm <- function(x, q, r, p){
   
   # autovalores e autovetores
   a <- eigen(cov(x))
-  d <- diag(a$values[1:r])
+  a1 <- a    # save eigen
+  d <- a$values[1:r]
   v <- a$vectors[,1:r]
   
   # estimativa dos fatores comuns
@@ -132,6 +128,6 @@ pcatodfm <- function(x, q, r, p){
     C <- as.matrix(v)
   }
   
-  list(A = A, C = C, Q = Q, R = R, initx = initx, initV = initV)
+  list(A = A, C = C, Q = Q, R = R, initx = initx, initV = initV, eigen = a1)
 }
 
