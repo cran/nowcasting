@@ -7,18 +7,15 @@
 base_extraction(series_code)
 }
 \arguments{
-\item{series_code}{Vector with the series encoding follow the Bacen (Banco Central do Brasil) standards.}
-}
-\value{
-A \code{mts} in the same specification required in argument \code{base} of function \code{nowcasting}
+\item{series_code}{Vector with the series encoding following the Bacen (Banco Central do Brasil) standards.}
 }
 \description{
 Create a time series matrix \code{mts} extracting information from Bacen (Banco Central do Brasil) API.
 }
 \examples{
 # Extracting GDP serie at real-time from Central Bank of Brasil data base
-gdp<-base_extraction(22099)
 \dontrun{
+gdp<-base_extraction(22099)
 # Industrial production (21859) serie at real-time from Central Bank of Brasil data base
 ind_prod<-base_extraction(21859)
 

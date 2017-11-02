@@ -1,14 +1,13 @@
 #' @title Create a real time data base
 #' @description Create a time series matrix \code{mts} extracting information from Bacen (Banco Central do Brasil) API.
-#' @param series_code Vector with the series encoding follow the Bacen (Banco Central do Brasil) standards.
+#' @param series_code Vector with the series encoding following the Bacen (Banco Central do Brasil) standards.
 #' @import xts
 #' @importFrom stats ts
 #' @import zoo
-#' @return A \code{mts} in the same specification required in argument \code{base} of function \code{nowcasting}
 #' @examples 
 #' # Extracting GDP serie at real-time from Central Bank of Brasil data base
-#' gdp<-base_extraction(22099)
 #' \dontrun{
+#' gdp<-base_extraction(22099)
 #' # Industrial production (21859) serie at real-time from Central Bank of Brasil data base
 #' ind_prod<-base_extraction(21859)
 #' 
@@ -68,26 +67,11 @@ basexts <- xts(base[,-1],as.Date(base[,1]))
 basemonth<-data.frame(apply.monthly(basexts,mean,na.rm=T))
 basemonth[is.na(basemonth)]<-NA
 
-# Trimestral para mensal
-# interpolação linear de trimestral para mensal
-# serie1344interp<-na.approx(basemonth$serie1344)   
-# basemonth$serie1344<-c(serie1344interp,rep(NA,length(basemonth$serie1344)-length(serie1344interp)))
-# serie7341interp<-na.approx(basemonth$serie7341)   
-# basemonth$serie7341<-c(rep(NA,which(!is.na(basemonth[,"serie7341"]))[1]-1),serie7341interp,rep(NA,nrow(basemonth) - (tail(which(!is.na(basemonth[,"serie7341"])),1))))
-
-# Acrescentando datas adicionais ----
-# nas<-data.frame(matrix(NA,nrow=10,ncol=dim(basemonth)[2]))
-# names(nas)<-names(basemonth)
-# basemonth1<-rbind(basemonth,nas)
-# mes_extra<-as.Date(row.names(basemonth1))[min(which(is.na(as.Date(row.names(basemonth1)))))-1]-days(3)+months(1:10)
-# row.names(basemonth1)<-c(row.names(basemonth[1:(length(basemonth)-11)]),as.character(mes_extra))
-# basemonth<-basemonth1
-
-# write.csv2(basemonth,paste0('./base_dados/base_mes_',Sys.Date(),'.csv'),na = '')
 year<-as.numeric(substr(row.names(basemonth)[1],1,4))
 month<-as.numeric(substr(row.names(basemonth)[1],6,7))
 mybase<-stats::ts(basemonth,start=c(year,month),freq=12)
-return(invisible(mybase))
+
+return(mybase)
 
 }
 
