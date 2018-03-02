@@ -1,4 +1,4 @@
-fd7e9ca2fd15581630b5d38e0d915e4a *DESCRIPTION
+c7ae6e364d2c22cda9e0dd753aa6a898 *DESCRIPTION
 632716835f9056beb61306c04d1e617a *NAMESPACE
 31fa67fb3842af8f28e034c37cb6cbe6 *R/BRGDP.R
 5d9d499a550e443af19275f2174b23ac *R/Bpanel.R
@@ -16,12 +16,8 @@ a75976bd3908c0324189a2eeb8b045a4 *R/month2qtr.R
 0fc561e1522d51453bd47b11d1582c49 *R/nowcast.plot.R
 1d088f48a5068ad319df5b1672d0cb23 *R/nowcasting.R
 7cb8f1b37b73a0c49e3e7ffe5eaf4f6c *R/qtr2month.r
-8133ca7bf534c3722908f448068ed5a4 *build/vignette.rds
 8b5756954e3cd321e96a77e00b603f62 *data/BRGDP.rda
 97fcdbcc923641a0d74613e218329109 *data/USGDP.rda
-9dedda1412ff7d7c1a9eec4d2928a868 *inst/doc/nowcasting-vignette.R
-5792641a399ab198abcf43fd7cc04050 *inst/doc/nowcasting-vignette.Rmd
-87bd4923c7c7ffe3c416790daba0c91c *inst/doc/nowcasting-vignette.html
 7cdf5ebf6afac2434885349ef6ecd55a *man/BRGDP.Rd
 869921417c5f1350575f7ce5223e0842 *man/Bpanel.Rd
 819d199f56bf50582a6cc2dd52696ffa *man/PRTDB.Rd
@@ -33,4 +29,3 @@ c881db2db0835f23f2da26e4d73aa373 *man/nowcast.Rd
 3ae510eab4982da42c8fed25731bc8b7 *man/nowcast.plot.Rd
 5be87c4e144cede48b9aeee8f86e462c *man/nowcasting.Rd
 a52826e7403c59b642a526cb4fe41009 *man/qtr2month.Rd
-5792641a399ab198abcf43fd7cc04050 *vignettes/nowcasting-vignette.Rmd
