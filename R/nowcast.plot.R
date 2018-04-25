@@ -1,90 +1,113 @@
 #' @title Plot for nowcast output function
-#' @description Make plot to visualize the output of nowcast function
-#' @param out Output of function nowcast
-#' @param type 'fcst', 'factors', 'eigenvalues','eigenvectors', 'month_y'
+#' @description Make plots to visualize the output of nowcast function
+#' @param out output of nowcast function.
+#' @param type 'fcst', 'factors', 'eigenvalues','eigenvectors' or 'month_y'. This last one is only available for EM method. 'eigenvalues' and 'eigenvectors' only available to two stages methods.
 #' @examples
 #' \dontrun{
-#' trans <- USGDP$Legenda$Transformation[-length(USGDP$Legenda$Transformation)]
-#' base <- USGDP$Base[,-dim(USGDP$Base)[2]]
-#' gdp <- month2qtr(USGDP$Base[,dim(USGDP$Base)[2]])
-#' x <- Bpanel(base = base, trans = trans)
-#' now <- nowcast(y = gdp, x = x,method = '2sq')
+#' gdp <- month2qtr(x = USGDP$base[,"RGDPGR"])
+#' gdp_position <- which(colnames(USGDP$base) == "RGDPGR")
+#' base <- Bpanel(base = USGDP$base[,-gdp_position],
+#'                trans = USGDP$legend$Transformation[-gdp_position],
+#'                aggregate = TRUE)
+#' now2sq <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sq')
 #' 
-#' nowcast.plot(now, type = "fcst")
-#' nowcast.plot(now, type = "factors")
-#' nowcast.plot(now, type = "eigenvalues")
-#' nowcast.plot(now, type = "eigenvectors")
+#' nowcast.plot(now2sq, type = "fcst")
+#' nowcast.plot(now2sq, type = "factors")
+#' nowcast.plot(now2sq, type = "eigenvalues")
+#' nowcast.plot(now2sq, type = "eigenvectors")
 #' 
-#' x2 <- Bpanel(base = base, trans = trans,aggregate = F)
-#' now2 <- nowcast(y = gdp, x = x2, q = 2, r = 3,method = '2sm')
+#' base <- Bpanel(base = USGDP$base[,-gdp_position],
+#'                trans = USGDP$legend$Transformation[-gdp_position],
+#'                aggregate = FALSE)
+#' now2sm <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sm')
 #' 
-#' nowcast.plot(now2, type = "fcst")
-#' nowcast.plot(now2, type = "factors")
-#' nowcast.plot(now2, type = "eigenvalues")
-#' nowcast.plot(now2, type = "eigenvectors")
+#' nowcast.plot(now2sm, type = "fcst")
+#' nowcast.plot(now2sm, type = "factors")
+#' nowcast.plot(now2sm, type = "eigenvalues")
+#' nowcast.plot(now2sm, type = "eigenvectors")
 #' }
 #' @export
 
 nowcast.plot <- function(out, type = "fcst"){
   
+
+  
   if(type == "fcst"){
     
-    data <- data.frame(date = as.Date(out$main), out$main)
+    data <- data.frame(date = as.Date(out$yfcst), out$yfcst)
     data[max(which(is.na(data$out))),"out"] <- data[max(which(is.na(data$out))),"in."] 
     
-    graphics::par(mar=c(5.1, 4.1, 4.1, 6), xpd = F)
+    graphics::par(mar=c(5.1, 4.1, 4.1, 5), xpd = F)
     graphics::plot(data[,"y"], xaxt = "n", main = "",  bty = "l",
          col = "#FFFFFF", ylab = "y unit", xlab = "Time")
     graphics::grid(col = "#D9D9D9")
     graphics::axis(1, at = seq(1,nrow(data),4), labels = substr(data[seq(1,nrow(data),4),"date"],1,7), las=1, cex = 0.7)
-    graphics::lines(data[,"y"], type = "l", lty = 3, col = "darkgrey")
-    graphics::lines(data[,"in."], type = "l", lty = 1, lwd = 1, col = "dodgerblue")
-    graphics::lines(data[,"out"], type = "l", lty = 2, lwd = 1, col = "orangered")
+    graphics::lines(data[,"y"], type = "l", lty = 1, col = 1)
+    graphics::lines(data[,"in."], type = "l", lty = 1, lwd = 2, col = "dodgerblue")
+    graphics::lines(data[,"out"], type = "l", lty = 4, lwd = 2, col = "orangered")
     graphics::par(xpd = T)
-    graphics::legend("topright", inset=c(-0.11,0), legend=c("y","yhat","fcst"), bty = "n",
-           lty = c(3,1,2), lwd = c(1,1,1), col = c("darkgrey","dodgerblue","orangered"))
+    add_legend("topright", legend=c("y","yhat","fcst"), bty = "n",
+           lty = c(1,1,4), lwd = c(1,2,2), col = c(1,"dodgerblue","orangered"))
     graphics::title(main = list("Forecasting", font = 1, cex = 0.9))
 
   }else if(type == "eigenvalues"){
   
+    if(!("reg" %in% names(out))){
+      stop('Graph not available for EM method')
+    }
+    
     graphics::par(mar = c(5.1,4.1,4.1,2.1), xpd = F)
     eig <- out$factors$eigen$values/sum(out$factors$eigen$values)*100
     n <- min(20,length(eig))
     graphics::barplot(eig[1:n], col = "#ADD8E6", border = "steelblue", names.arg = 1:n, ylim = c(0, seq(0,100,5)[min(which(!(max(eig[1:n]) > seq(0,100,5))))]),
             xlab = "eigenvalues", ylab = "%")
     graphics::grid(col = "#D9D9D9")
-    graphics::title(main = list("eigenvalues: percentual variance", font = 1, cex = 0.9))
+    graphics::title(main = list("eigenvalues: percentage variance", font = 1, cex = 0.9))
 
   }else if(type == "eigenvectors"){
     
-    graphics::par(mar = c(5.1,4.1,4.1,6), xpd = F)
+    if(!("reg" %in% names(out))){
+      stop('Graph not available for EM method')
+    }
+    
+    graphics::par(mar = c(5.1,4.1,4.1,5), xpd = F)
     vec <- out$factors$eigen$vectors[,1]
     pvec <- (out$factors$eigen$vectors[,1]^2)*100
     color <- ifelse(vec >= 0, "dodgerblue", "orangered")
     graphics::plot(pvec, main = "",  bty = "l", xaxt = "n", type = "h", ylab = "weight (%)", xlab = "variable", col = color)
     graphics::axis(1, at = seq(1,length(vec),1), labels = seq(1,length(vec),1), las=1, cex = 0.7)
-    graphics::title(main = list("Variable Percentual Weight in Factor 1", font = 1, cex = 0.9))
+    graphics::title(main = list("Variable Percentage Weight in Factor 1", font = 1, cex = 0.9))
     graphics::par(xpd = T)
-    graphics::text(y = max(pvec)*1.08, x = length(pvec)*1.1, labels = "signal weights:", col = 1, cex = 0.8)
-    graphics::text(y = max(pvec), x = length(pvec)*1.1, labels = "positive", col = "dodgerblue", cex = 0.8)
-    graphics::text(y = max(pvec)*0.92, x = length(pvec)*1.1, labels = "negative", col = "orangered", cex = 0.8)
+    graphics::text(y = max(pvec), x = length(pvec)*1.1, labels = "signal weights:", col = 1, cex = 0.8)
+    graphics::text(y = max(pvec)*0.94, x = length(pvec)*1.1, labels = "positive", col = "dodgerblue", cex = 0.8)
+    graphics::text(y = max(pvec)*0.88, x = length(pvec)*1.1, labels = "negative", col = "orangered", cex = 0.8)
 
     
   }else if(type == "factors"){
     
-    graphics::par(mar=c(5.1, 4.1, 4.1, 6), xpd = F)
+    graphics::par(mar=c(5.1, 4.1, 4.1, 5), xpd = F)
     n <- ncol(data.frame(out$factors$dynamic_factors))
     stats::ts.plot(out$factors$dynamic_factors, col = c(1,"orangered","blue"), lty = c(1,2,3), gpars = list(bty = "l"))
     anos <- unique(as.numeric(substr(as.Date(out$factors$dynamic_factors),1,4)))
     graphics::grid()
     graphics::par(xpd = T)
     graphics::title(main = list("Estimated Factors", font = 1, cex = 1))
-    graphics::legend("topright", inset = -0.11, legend = paste("Factor", 1:n), bty = "n",
-           col = c(1,"orangered","blue"), lty = c(1,2,3), cex = 0.9)
+    
+    if("month_y" %in% names(out)){
+      leg <- colnames(out$factors$dynamic_factors)
+    }else{
+      leg <- paste("Factor", 1:n)
+    }
+    add_legend("topright", legend = leg, bty = "n",
+           col = c(1,"orangered","blue"), lty = c(1,2,3), lwd = c(1,1,1,2,2,2), cex = 0.9)
     
   }else if(type == 'month_y'){
     
-    Y<-stats::ts(rep(out$main[,1],each=3),end=end(qtr2month(out$main[,1])),frequency = 12)
+    if("reg" %in% names(out)){
+      stop("Graph not available for '2sq' and '2sm' methods")
+    }
+    
+    Y<-stats::ts(rep(out$yfcst[,1],each=3),end=end(qtr2month(out$yfcst[,1])),frequency = 12)
     YY<-cbind(out$month_y,Y)
     ## add extra space to right margin of plot within frame
     graphics::par(mar=c(5, 4, 4, 5.7) + 0.1,xpd=F)

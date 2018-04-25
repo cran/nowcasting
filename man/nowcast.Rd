@@ -2,62 +2,75 @@
 % Please edit documentation in R/nowcast.R
 \name{nowcast}
 \alias{nowcast}
-\title{Nowcasting of a quarterly time serie using a dynamic factor.}
+\title{Nowcasting of a quarterly time series using a dynamic factor model.}
 \usage{
 nowcast(y, x, q = NULL, r = NULL, p = NULL, method = "2sq",
   blocks = NULL)
 }
 \arguments{
-\item{y}{Stationary quarterly time-series}
+\item{y}{Stationary quarterly time series.}
 
-\item{x}{A time series matrix (\code{mts}) representing the regressors of interest. The series must be stationary.}
+\item{x}{A monthly time series matrix (\code{mts}) representing regressors variables. The series must be stationary.}
 
 \item{q}{Dynamic rank. Number of error terms.}
 
-\item{r}{Static rank or number of factors (r>=q, for methods 2sq and 2sm).}
+\item{r}{number of commom factors.}
 
-\item{p}{AR order of factors.}
+\item{p}{AR order of factor model.}
 
-\item{method}{2sq: Two stages quarterly as in Giannone et al. 2008; 2sm: Two stages monthly as in Bańbura and Runstler 2011; EM: Expected Maximization as in Bańbura et al. 2011}
+\item{method}{There are three options: \code{"2sq"}: "Two stages: quarterly factors" as in Giannone et al. 2008; \code{"2sm"}: "Two stages: monthly factors" as in Bańbura and Runstler 2011; \code{"EM"}: Expected Maximization as in Bańbura et al. 2011.}
 
-\item{blocks}{only for EM method. Select which factors impact the variables (global, nominal or real).}
+\item{blocks}{a binary matrix Nx3 that characterizes the regressors variables in global (1st column), nominal (2nd column) and real (3rd column). If \code{NULL}, the matrix assume 1 for all cells.}
 }
 \value{
 A \code{list} containing two elements:
 
-A \code{mts} named \code{main} contains the original serie, the estimation in the sample, the estimation out of the sample;
-
-A \code{list} named \code{factors} contains the estimated factors and coeffients.
-
-A \code{mts} named \code{fore_x} contains the output of all regressors.
-
-A \code{mts} named \code{month_y} contains the a monthly measure for GDP.
+\item{yfcst}{the original \code{y} series and its in-sample and out-of-sample estimations.}
+\item{reg}{regression model between \code{y} and the estimated factors. Not available for EM method.}
+\item{factors}{the estimated factors and DFM model coefficients.}
+\item{xfcst}{the original regressors and their out-of-sample estimations.}
+\item{month_y}{the monthly measure for quarterly \code{y} variable. Only available for EM method.}
 }
 \description{
-Estimate nowcasting and foreacasting for a quarterly time serie. For more details read the Vignettes.
+Estimate nowcasting and forecasting for a quarterly series. For more details read the Vignettes.
 }
 \examples{
 \dontrun{
-# nowcast function examples:
-### Method 2sq
-pib<-BRGDP[,8]
-y<-month2qtr(diff(diff(pib,3),12))
-x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = T)
-q<-1
-r<-2
-p<-1
-now_2sq<-nowcast(y,x,q,r,p,method = '2sq')
+### Method 2sq (two stages: quarterly factors)
+gdp <- month2qtr(x = USGDP$base[,"RGDPGR"])
+gdp_position <- which(colnames(USGDP$base) == "RGDPGR")
+base <- Bpanel(base = USGDP$base[,-gdp_position],
+               trans = USGDP$legend$Transformation[-gdp_position],
+               aggregate = TRUE)
+now2sq <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sq')
 
-### Method 2sm
-pib<-BRGDP[,8]
-y<-month2qtr(diff(diff(pib,3),12))
-x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = F)
-now_2sm<-nowcast(y,x,q,r,p,method = '2sm')
+### Method 2sm (two stages: monthly factors)
+base <- Bpanel(base = USGDP$base[,-gdp_position],
+               trans = USGDP$legend$Transformation[-gdp_position],
+               aggregate = F)
+now2sm <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sm')
 
 ### Method EM
-y<-month2qtr(diff(diff(pib,3),12))
-x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = F)
-now_em<-nowcast(y,x,q,r,p,'EM')
+# selecting and transforming y  
+gdp <- month2qtr(x = USGDPshort$base[,"GDPUS"])
+gdp <- ts(c(gdp,NA,NA,NA,NA), start = start(gdp), frequency = 4)
+gdp_stationary <- gdp/lag(gdp, k = -1) -1
+gdp_position <- which(colnames(USGDPshort$base) == "GDPUS")
+
+# selecting and transforming x 
+base <- USGDPshort$base[,-gdp_position]
+trans <- USGDPshort$legend[-gdp_position,"transformation"]
+stationaryBase <- cbind(base[,trans == 1]/lag(base[,trans == 1], k = -1) - 1,
+                        diff(base[,trans == 2]))
+colnames(stationaryBase) <- colnames(base)[c(which(trans == 1),which(trans == 2)) ]
+stationaryBase <- stationaryBase[,colnames(base)]
+
+# DFM estimation via EM
+blocks <- matrix(c(1,0,1,1,0,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,
+                   0,1,1,0,1,1,0,1,0,1,1,1,0,1,1,0,1,0,1,1,1,0,1,1,0,1,
+                   1,0,1,0,1,1,0,1,1,0,1,1,0,1,1,1,0,1,0,1,1,0,1,1,1,0), byrow = T, ncol = 3)
+nowEM <- nowcast(y = gdp_stationary, x = stationaryBase, r = 1, p = 1, q = 1,
+                 method = 'EM', blocks = blocks)
 }
 }
 \references{

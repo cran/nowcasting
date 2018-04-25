@@ -1,19 +1,25 @@
 #' @title Create Real Time Data Base
 #' @description Create a time series matrix \code{mts} replicating the information available in a given date.
-#' @param series_code Vector with the series encoding follow the Bacen (Banco Central do Brasil) standards.
-#' @param vintage The vintage encoded by the day of the extraction
+#' @param series_code vector with the series encoding following the Bacen (Banco Central do Brasil) standards.
+#' @param vintage the vintage encoded by the day of the extraction
 #' @import DBI RMySQL xts zoo
 #' @importFrom stats ts
 #' @examples
+#' \dontrun{
 #' # Show series available:
-#' # RTDB()
-#' # Show vintages available for a serie:
-#' # RTDB(series_code=1)
+#' RTDB()
+#' 
+#' # Show vintages available for the series 1:
+#' RTDB(series_code = 1)
+#' 
+#' # Show series 1 data at vintage 2017-04-04:
+#' RTDB(series_code = 1, vintage = "2017-04-04")
+#' }
 #' @references Central Bank of Brazil
 #' @export
 
 
-RTDB<-function(series_code = NULL,vintage = NULL){
+RTDB <- function(series_code = NULL, vintage = NULL){
 
   # library(DBI)
   # library(RMySQL)
@@ -69,7 +75,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
   
   
   SQL<-paste("SELECT * FROM dbvintage")
-  conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+  conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
   dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
   DBI::dbDisconnect(conn)
   temounaotem<-sapply(3:(dim(dados0)[2]-1),function(y) tapply(dados0[,y], dados0[,dim(dados0)[2]], function(x) sum(is.na(x))==length(x)))
@@ -77,7 +83,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
 
     if(is.null(series_code) & is.null(vintage)){  # Caso não ofereça nenhum argumento
       SQL<-"SELECT `COLUMN_NAME` FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE `TABLE_SCHEMA`='pibnow' AND `TABLE_NAME`='dbvintage'"
-      conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+      conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
       dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
       DBI::dbDisconnect(conn)
       dados1<-data.frame(series_code=substr(dados0[3:(dim(dados0)[1]-1),],6,50))
@@ -90,12 +96,12 @@ RTDB<-function(series_code = NULL,vintage = NULL){
         message('Are you interest in the nowcast? \nGreat! Try the function nowcast.')
       }else{
         SQL<-paste("SELECT * FROM dbvintage WHERE vintage_cod =",paste0("\'",v_ind,"\'"))
-        conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+        conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
         dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
         DBI::dbDisconnect(conn)
         if(nrow(dados0)==0){ # Caso tal vintage não esteja disponível
           SQL<-paste("SELECT vintage_cod FROM dbvintage")
-          conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+          conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
           dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
           DBI::dbDisconnect(conn)
           
@@ -139,7 +145,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
       }else{
         return_try<-tryCatch({
                     SQL<-paste("SELECT", paste0('X,',paste0("serie",series_code,collapse = ',')) ,"FROM dbvintage WHERE vintage_cod =",paste0("\'",v_ind,"\'"))
-                    conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+                    conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
                     dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
                     DBI::dbDisconnect(conn)},
                     error = function(err) {
@@ -150,7 +156,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
         }else{ # Se a série está no banco de dados
           if(nrow(dados0)==0){  # mas não há vintage disponível para ela
             # SQL<-paste("SELECT vintage_cod FROM dbvintage")
-            # conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+            # conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
             # dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
             # DBI::dbDisconnect(conn)
             # temounaotem
@@ -159,7 +165,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
             if(as.Date(vintage)<vintage_cod[1]){  # Se a vintage é anterior à primeira vintage
               # v_ind<-vintage_cod[1]
               # SQL<-paste("SELECT", paste0('X,',paste0("serie",series_code,collapse = ',')) ,"FROM dbvintage WHERE vintage_cod =",paste0("\'",v_ind,"\'"))
-              # conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+              # conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
               # dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
               # DBI::dbDisconnect(conn)
               # dados1<-ts(dados0[,-1],start=as.numeric(c(substr(dados0[1,1],1,4),substr(dados0[1,1],6,7))),frequency=12)
@@ -172,7 +178,7 @@ RTDB<-function(series_code = NULL,vintage = NULL){
               ind_previous<-max(which(vintage_cod<as.Date(vintage)))
               v_ind<-vintage_cod[ind_previous]
               SQL<-paste("SELECT", paste0('X,',paste0("serie",series_code,collapse = ',')) ,"FROM dbvintage WHERE vintage_cod =",paste0("\'",v_ind,"\'"))
-              conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.20.164.178",port=3306)
+              conn = dbConnect(MySQL(),db="pibnow",user="pibnow_user",password="123456",host="200.18.49.107",port=3306)
               dados0 <- DBI::dbGetQuery(conn = conn,statement = SQL)
               DBI::dbDisconnect(conn)
               dados1<-ts(dados0[,-1],start=as.numeric(c(substr(dados0[1,1],1,4),substr(dados0[1,1],6,7))),frequency=12)

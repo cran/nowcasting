@@ -1,21 +1,19 @@
-#' @title Nowcasting of a quarterly time serie using a dynamic factor.
-#' @description Estimate nowcasting and foreacasting for a quarterly time serie. For more details read the Vignettes.
-#' @param y Stationary quarterly time-series 
-#' @param x A time series matrix (\code{mts}) representing the regressors of interest. The series must be stationary.
+#' @title Nowcasting of a quarterly time series using a dynamic factor model.
+#' @description Estimate nowcasting and forecasting for a quarterly series. For more details read the Vignettes.
+#' @param y Stationary quarterly time series. 
+#' @param x A monthly time series matrix (\code{mts}) representing regressors variables. The series must be stationary.
 #' @param q Dynamic rank. Number of error terms.
-#' @param r Static rank or number of factors (r>=q, for methods 2sq and 2sm).
-#' @param p AR order of factors.
-#' @param method 2sq: Two stages quarterly as in Giannone et al. 2008; 2sm: Two stages monthly as in Bańbura and Runstler 2011; EM: Expected Maximization as in Bańbura et al. 2011
-#' @param blocks only for EM method. Select which factors impact the variables (global, nominal or real).
+#' @param r number of commom factors.
+#' @param p AR order of factor model.
+#' @param method There are three options: \code{"2sq"}: "Two stages: quarterly factors" as in Giannone et al. 2008; \code{"2sm"}: "Two stages: monthly factors" as in Bańbura and Runstler 2011; \code{"EM"}: Expected Maximization as in Bańbura et al. 2011.
+#' @param blocks a binary matrix Nx3 that characterizes the regressors variables in global (1st column), nominal (2nd column) and real (3rd column). If \code{NULL}, the matrix assume 1 for all cells.
 #' @return A \code{list} containing two elements:
 #' 
-#' A \code{mts} named \code{main} contains the original serie, the estimation in the sample, the estimation out of the sample;
-#' 
-#' A \code{list} named \code{factors} contains the estimated factors and coeffients.
-#' 
-#' A \code{mts} named \code{fore_x} contains the output of all regressors.
-#' 
-#' A \code{mts} named \code{month_y} contains the a monthly measure for GDP. 
+#' \item{yfcst}{the original \code{y} series and its in-sample and out-of-sample estimations.}
+#' \item{reg}{regression model between \code{y} and the estimated factors. Not available for EM method.}
+#' \item{factors}{the estimated factors and DFM model coefficients.}
+#' \item{xfcst}{the original regressors and their out-of-sample estimations.}
+#' \item{month_y}{the monthly measure for quarterly \code{y} variable. Only available for EM method.}
 #' 
 #' @references Giannone, D., Reichlin, L., & Small, D. (2008). Nowcasting: The real-time informational content of macroeconomic data. Journal of Monetary Economics, 55(4), 665-676.<doi:10.1016/j.jmoneco.2008.05.010>
 #' 
@@ -25,33 +23,48 @@
 #' 
 #' @examples
 #' \dontrun{
-#' # nowcast function examples:
-#' ### Method 2sq
-#' pib<-BRGDP[,8]
-#' y<-month2qtr(diff(diff(pib,3),12))
-#' x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = T)
-#' q<-1
-#' r<-2
-#' p<-1
-#' now_2sq<-nowcast(y,x,q,r,p,method = '2sq')
+#' ### Method 2sq (two stages: quarterly factors)
+#' gdp <- month2qtr(x = USGDP$base[,"RGDPGR"])
+#' gdp_position <- which(colnames(USGDP$base) == "RGDPGR")
+#' base <- Bpanel(base = USGDP$base[,-gdp_position],
+#'                trans = USGDP$legend$Transformation[-gdp_position],
+#'                aggregate = TRUE)
+#' now2sq <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sq')
 #'
-#' ### Method 2sm
-#' pib<-BRGDP[,8]
-#' y<-month2qtr(diff(diff(pib,3),12))
-#' x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = F)
-#' now_2sm<-nowcast(y,x,q,r,p,method = '2sm')
+#' ### Method 2sm (two stages: monthly factors)
+#' base <- Bpanel(base = USGDP$base[,-gdp_position],
+#'                trans = USGDP$legend$Transformation[-gdp_position],
+#'                aggregate = F)
+#' now2sm <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2sm')
 #'
 #' ### Method EM
-#' y<-month2qtr(diff(diff(pib,3),12))
-#' x<-Bpanel(BRGDP[,-8],rep(4,dim(BRGDP)[2]),aggregate = F)
-#' now_em<-nowcast(y,x,q,r,p,'EM')
+#' # selecting and transforming y  
+#' gdp <- month2qtr(x = USGDPshort$base[,"GDPUS"])
+#' gdp <- ts(c(gdp,NA,NA,NA,NA), start = start(gdp), frequency = 4)
+#' gdp_stationary <- gdp/lag(gdp, k = -1) -1
+#' gdp_position <- which(colnames(USGDPshort$base) == "GDPUS")
+#' 
+#' # selecting and transforming x 
+#' base <- USGDPshort$base[,-gdp_position]
+#' trans <- USGDPshort$legend[-gdp_position,"transformation"]
+#' stationaryBase <- cbind(base[,trans == 1]/lag(base[,trans == 1], k = -1) - 1,
+#'                         diff(base[,trans == 2]))
+#' colnames(stationaryBase) <- colnames(base)[c(which(trans == 1),which(trans == 2)) ]
+#' stationaryBase <- stationaryBase[,colnames(base)]
+#' 
+#' # DFM estimation via EM
+#' blocks <- matrix(c(1,0,1,1,0,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,
+#'                    0,1,1,0,1,1,0,1,0,1,1,1,0,1,1,0,1,0,1,1,1,0,1,1,0,1,
+#'                    1,0,1,0,1,1,0,1,1,0,1,1,0,1,1,1,0,1,0,1,1,0,1,1,1,0), byrow = T, ncol = 3)
+#' nowEM <- nowcast(y = gdp_stationary, x = stationaryBase, r = 1, p = 1, q = 1,
+#'                  method = 'EM', blocks = blocks)
 #' }
 #' @seealso \code{\link[nowcasting]{base_extraction}}
 #' @export
 
-nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL){
+nowcast <- function(y, x, q = NULL, r = NULL, p = NULL, method='2sq', blocks = NULL){
 
-  if(is.null(q) & is.null(r) & is.null(p)){
+  if(is.null(q) | is.null(r) | is.null(p)){
     warnings('Parameters q, r and p must be specified.')
   }
   
@@ -61,15 +74,15 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
     prev <- bridge(y,fatores)
 
     # voltar da padronização
-    fit<-matrix(factors$dynamic_factors,ncol = r*p)[,1:r]%*%t(factors$eigen$vectors[,1:r])
-    colnames(fit)<-colnames(x)
-    x <- x
-    z <- x
-    s <- apply(z, MARGIN = 2, FUN = sd,na.rm=T)
-    M <- apply(z, MARGIN = 2, FUN = mean,na.rm=T)
-    for(i in 1:dim(x)[2]){
-      z[,i] <- (x[,i] - M[i])/s[i]
-    }
+    fit <- as.matrix(factors$dynamic_factors) %*% t(factors$eigen$vectors[,1:r])
+    colnames(fit) <- colnames(x)
+    s <- apply(x, MARGIN = 2, FUN = sd,na.rm=T)
+    M <- apply(x, MARGIN = 2, FUN = mean,na.rm=T)
+    # x <- x
+    # z <- x
+    # for(i in 1:dim(x)[2]){
+    #   z[,i] <- (x[,i] - M[i])/s[i]
+    # }
     x1<-fit
     fore_x<-x[,colnames(x) %in% colnames(fit)]
     for(i in colnames(fit)){
@@ -77,8 +90,10 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
       fore_x[is.na(fore_x[,i]),i] <- x1[is.na(fore_x[,i]),i]
     }
  
-    res<-list(main = prev$main, reg = prev$reg, factors = factors,fore_x = fore_x)
-    
+    names(factors) <- c("dynamic_factors", "A", "Lambda","BB","Psi","initx","initV","eigen")
+    res <-list(yfcst = prev$main, reg = prev$reg, factors = factors, xfcst = fore_x)
+    res$reg$call$data <- NULL
+
   }else if(method=='2sm'){
     factors <- FactorExtraction(x, q = q, r = r, p = p)
     fatores <- stats::filter(factors$dynamic_factors, c(1,2,3,2,1), sides = 1)
@@ -90,15 +105,15 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
     month_y<-ts(aux_fator_month%*%prev$reg$coefficients,start=start(factors$dynamic_factors),frequency=12)
     
     # voltar da padronização
-    fit<-matrix(factors$dynamic_factors,ncol = r*p)[,1:r]%*%t(factors$eigen$vectors[,1:r])
-    colnames(fit)<-colnames(x)
-    x <- x
-    z <- x
-    s <- apply(z, MARGIN = 2, FUN = sd,na.rm=T)
-    M <- apply(z, MARGIN = 2, FUN = mean,na.rm=T)
-    for(i in 1:dim(x)[2]){
-      z[,i] <- (x[,i] - M[i])/s[i]
-    }
+    fit <- as.matrix(factors$dynamic_factors) %*% t(factors$eigen$vectors[,1:r])
+    colnames(fit) <- colnames(x)
+    s <- apply(x, MARGIN = 2, FUN = sd,na.rm=T)
+    M <- apply(x, MARGIN = 2, FUN = mean,na.rm=T)
+    # x <- x
+    # z <- x
+    # for(i in 1:dim(x)[2]){
+    #   z[,i] <- (x[,i] - M[i])/s[i]
+    # }
     x1<-fit
     fore_x<-x[,colnames(x) %in% colnames(fit)]
     for(i in colnames(fit)){
@@ -106,10 +121,16 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
       fore_x[is.na(fore_x[,i]),i] <- x1[is.na(fore_x[,i]),i]
     }
     
-    res<-list(main = prev$main, reg = prev$reg, factors = factors,fore_x = fore_x,month_y = month_y)
-    
+    names(factors) <- c("dynamic_factors", "A", "Lambda","BB","Psi","initx","initV","eigen")
+    res <- list(yfcst = prev$main, reg = prev$reg, factors = factors, xfcst = fore_x, month_y = month_y)
+    res$reg$call$data <- NULL
     
   }else if(method=='EM'){
+    
+    if(p > 5){
+      stop('Parameter p must be less than 5.')
+    }
+    
     # y1<-qtr2month(y)
     # y1[rep(which(!is.na(y1)),each=2)-c(2,1)]<-rep(y1[!is.na(y1)],each=2)
     # X<-cbind(x,y1)
@@ -128,8 +149,21 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
               q = matrix(rep(0,4),4,1),nQ = 1,
               blocks = blocks)
     Res<-EM_DFM_SS_block_idioQARMA_restrMQ(X,Par)
-    factors<-list(dynamic_factors = Res$FF,A = Res$A, C = Res$C, Q = Res$Q, R = Res$R, initx = Res$Z_0,
-            initV = Res$V_0)
+    
+    factors<-list(
+      dynamic_factors = ts(Res$FF[,c(1:r, (r*5 + 1):(r*5 + r), (2*r*5 + 1):(2*r*5 + r))], start = start(x), frequency = 12),
+      T = Res$A,
+      Z = Res$C,
+      #xBart = ts(Res$X_sm, start = start(x), freq = 12),
+      #xt = ts(Res$X_sm[,-ncol(Res$X_sm)], start = start(x), freq = 12),
+      muBar = Res$Mx,
+      mu = Res$Mx[-length(Res$Mx)],
+      sigma = Res$Wx,
+      Q = Res$Q, R = Res$R, initx = Res$Z_0, initV = Res$V_0)
+    
+    colnames(factors$dynamic_factors) <- c(paste0("globalFactor",1:r),paste0("nominalFactor",1:r),paste0("realFactor",1:r))
+    
+    
     # fore_x<-ts(Res$X_sm[,-dim(Res$X_sm)[2]],start=start(X),frequency = 12)
     fore_x<-ts(Res$X_sm,start=start(X),frequency = 12)
     yprev<-month2qtr(ts(Res$X_sm[,dim(Res$X_sm)[2]],start=start(X),frequency = 12))
@@ -139,13 +173,15 @@ nowcast <- function(y, x, q = NULL, r = NULL, p = NULL,method='2sq',blocks=NULL)
     colnames(Y)<-c('y','in','out')
     
     ind<-c(1:r,1:r+r*5,1:r+r*5*2,dim(Res$C)[2]-4)
-    month_y<-ts(Res$Mx[length(Res$Mx)]/9+Res$FF[,ind]%*%Res$C[7,ind]*Res$Wx[length(Res$Wx)],start=start(X),frequency = 12)
+    month_y<-ts(Res$Mx[length(Res$Mx)]/9+Res$FF[,ind]%*%Res$C[nrow(Res$C),ind]*Res$Wx[length(Res$Wx)],start=start(X),frequency = 12)
+    
     # Essa é uma medida trimestral do PIB acumulado nos últimos três meses
     # month_y<-ts(Res$X_sm[,dim(Res$X_sm)[2]],start=start(X),frequency = 12)
     fore_x = fore_x[,-dim(fore_x)[2]]
     colnames(fore_x)<-colnames(x)
     
-    res <- list(main = Y,factors = factors,fore_x = fore_x, month_y = month_y)
+    #names(factors) <- c("dynamic_factors", "T", "Z","Q","R","initx","initV")
+    res <- list(yfcst = Y, factors = factors, xfcst = fore_x, month_y = month_y)
     
   }
 

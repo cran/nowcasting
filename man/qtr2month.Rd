@@ -2,23 +2,23 @@
 % Please edit documentation in R/qtr2month.r
 \name{qtr2month}
 \alias{qtr2month}
-\title{Quarterly to monthly desagregation}
+\title{Quarterly to monthly transformation}
 \usage{
 qtr2month(x)
 }
 \arguments{
-\item{x}{Variable in quarterly frequency}
+\item{x}{a \code{ts} or \code{mts} in quarterly frequency}
 }
 \value{
-The correpondent monthly transformation or agregation.
+The correpondent monthly transformation.
 }
 \description{
-It transforsms a quarterly time series in a monthly. To the last month of the monthly \code{ts} is set the value of the quarterly \code{ts}.
+It transforms a quarterly  time series in a monthly one. The values of the quarterly \code{ts} are set to the last month of the quarter.
 }
 \examples{
-# Selecting only last month of matrix time series BRGDP:
-mestri_vintage<-month2qtr(BRGDP[,dim(BRGDP)[2]])
+# Selecting the quarterly GDP variable in BRGDP
+brgdp <- month2qtr(BRGDP[,ncol(BRGDP)])
 
-qtr2month(mestri_vintage) 
+qtr2month(brgdp) 
 
 }
