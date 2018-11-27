@@ -4,10 +4,12 @@
 \alias{month2qtr}
 \title{Monthly to quarterly transformation}
 \usage{
-month2qtr(x)
+month2qtr(x, reference_month = 3)
 }
 \arguments{
 \item{x}{a \code{ts} or \code{mts} in monthly frequency}
+
+\item{reference_month}{a vector to define the reference month that will represent the quarter. Default is 3. The options are 1, 2, 3 or 'mean'.}
 }
 \value{
 The correspondent quarterly transformation.
@@ -16,10 +18,11 @@ The correspondent quarterly transformation.
 It transforms a monthly time series in a quarterly one, selecting the last month of the quarter to represent the value of the quarter.
 }
 \examples{
-# Selecting only last month of matrix time series BRGDP:
-month2qtr(BRGDP)
+ \dontrun{
+# Selecting only the last month of time series IPCA:
+month2qtr(BRGDP$base[,"IPCA"], reference_month = 3)
 
-# Vehicle production in the quarter from vehicle production in the month
-month2qtr(stats::filter(BRGDP[,3],c(1,1,1),sides=1))
-
+# Selecting only the first month of time series IPCA:
+month2qtr(BRGDP$base[,"IPCA"], reference_month = 1)
+}
 }

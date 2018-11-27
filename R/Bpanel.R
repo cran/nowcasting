@@ -23,105 +23,132 @@
 #'   \item{trans = 4: monthly difference in year difference
 #'   
 #'   \deqn{(x_{i,t} - x_{i,t-12})  -  (x_{i,t-1} - x_{i,t-13})}}
-#' }
+#'   
+#'   \item{trans = 5: yearly difference
+#'   
+#'   \deqn{(x_{i,t} - x_{i,t-12})}}
+#'   
+#'   \item{trans = 6: yearly rate of change
+#'   
+#'   \deqn{\frac{x_{i,t} - x_{i,t-12}}{x_{i,t-12}}}}
+#'  } 
+#' 
 #' @param aggregate A \code{boolean} representing if you want aggregate the monthly variables to represent quarterly quantities. If \code{TRUE} the aggregation is made following the approximation of \emph{Mariano and Murasawsa 2003}.
-#' @param k_ma A \code{numeric} representing the degree of the moving average correction.
+#' @param k.ma A \code{numeric} representing the degree of the moving average correction.
+#' @param na.prop A \code{numeric} representing the proportion of NA allowed. Default is 1/3.
+#' @param h A \code{numeric} representing the number of steps ahead to forecasting. Default is 12.
 #' @references Giannone, D., Reichlin, L., & Small, D. (2008). Nowcasting: The real-time informational content of macroeconomic data. Journal of Monetary Economics, 55(4), 665-676.<doi:10.1016/j.jmoneco.2008.05.010>
 #' 
 #' Mariano, R. S., & Murasawa, Y. (2003). A new coincident index of business cycles based on monthly and quarterly series. Journal of applied Econometrics, 18(4), 427-443.<doi:10.1002/jae.695>
 #' @examples 
 #' # Example from database BRGDP:
-#' Bpanel(BRGDP,rep(3,ncol(BRGDP)))
+#' data(BRGDP)
+#' Bpanel(BRGDP$base, rep(3,ncol(BRGDP$base)))
 #' @import zoo
-#' @importFrom stats filter
+#' @importFrom stats filter lag
 #' @export
 
 
-Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k_ma = 3){
+Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k.ma = 3, na.prop = 1/3, h = 12){
   
   if(is.null(trans)){
     stop('trans can not to be NULL')
   }
   
-  # Transformar os dados de acordo com a especificação dada
-  base1<-base
-  for(j in 1:dim(base)[2]){
-    base1[,j]<-NA
-    if(trans[j] == 1){  # TAXA DE VARIAÇÃO MENSAL
-      temp <- diff(base[,j])/stats::lag(base[,j],-1)
+  if(sum(is.na(trans)) != 0){
+    stop('trans does not support missings values')
+  }
+  
+  if(length(trans) != ncol(base)){
+    stop('the number of elements in the vector must be equal to the number of columns of base')
+  }
+  
+  if(sum(!names(table(trans)) %in% c(0:6)) != 0){
+    stop('the only available transformations are 0, 1, 2, 3, 4, 5 and 6.')
+  }
+  
+  if(na.prop <= 0 | na.prop >= 1){
+    stop("na.prop must be between 0 and 1.")
+  }
+  
+  # data transformation
+  base1 <- base
+  for(j in 1:ncol(base)){
+    base1[,j] <- NA
+    if(trans[j] == 1){  # monthly rate of change
+      temp <- diff(base[,j]) / stats::lag(base[,j], -1)
       base1[-1,j] <- temp
-    }else if(trans[j] == 2){ # DIFERENÇA MENSAL
+    }else if(trans[j] == 2){ # monthly difference
       temp <- diff(base[,j])
       base1[-1,j] <- temp
-    }else if(trans[j] == 3){ # DIFERENÇA MENSAL DA TAXA DE VARIAÇÃO ANUAL
-      temp <- diff(diff(base[,j],12)/stats::lag(base[,j],-12))
+    }else if(trans[j] == 3){ # monthly difference in year-over-year rate of change
+      temp <- diff(diff(base[,j], 12) / stats::lag(base[,j], -12))
       base1[-c(1:13),j] <- temp
-    }else if(trans[j] == 4){ # DIFERENÇA MENSAL DA DIFERENÇA ANUAL
+    }else if(trans[j] == 4){ # monthly difference in year difference
       temp <- diff(diff(base[,j],12))
       base1[-c(1:13),j] <- temp
-    }else{ # SEM TRANSFORMAÇÃO
+    }else if(trans[j] == 5){ # yearly difference
+      temp <- diff(base[,j],12)
+      base1[-c(1:12),j] <- temp  
+    }else if(trans[j] == 6){ # yearly rate of change
+      temp <- base[,j] / stats::lag(base[,j],-12)
+      base1[-c(1:12),j] <- temp  
+    }else if(trans[j] == 0){ # no transformation
       base1[,j] <- base[,j]
     }
   }
   
- 
-  
-  # transformação de diferença mensal/variação em trimestral
-  if (aggregate==T){
-  base1<-stats::filter(base1, c(1,2,3,2,1), sides = 1)
+  # transformation of monthly series into quarterly quantities
+  if(aggregate == T){
+    for(j in 1:ncol(base)){
+      if(trans[j] %in% c(1,2,3,4)){
+        # transformation of monthly differences/rates based on Mariano and Murasawa (2003)
+        base1[,j] <- stats::filter(base1[,j], c(1,2,3,2,1), sides = 1)
+      }
+      else if(trans[j] %in% c(5,6)){
+        # transformation of yearly difference/rate
+        base1[,j] <- stats::filter(base1[,j], c(1,1,1), sides = 1)
+      }
+    }
   }
-  colnames(base1)<-colnames(base)
-  # fazer a amostra iniciar sempre no primeiro mês do trimestre (Por que?)
-  # if(time[1,2] %% 3 == 2){ # se a amostra começa no segundo mês do trimestre
-  #   X <- data.frame(X[3:nrow(X),])
-  #   dates <- data.frame(data = as.character(dates[3:nrow(dates),]))
-  #   time <- time[3:nrow(time),]
-  # }else if(time[1,2] %% 3 == 0){ # se a amostra começa no último mês do trimestre
-  #   X <-  data.frame(X[2:nrow(X),])
-  #   dates <- data.frame(data = as.character(dates[2:nrow(dates),]))
-  #   time <- time[2:nrow(time),]
-  # }
-  # colnames(X) <- nomes
+  colnames(base1) <- colnames(base)
   
-  
-  # usar apenas as séries com menos de 1/3 de missings
-  SerOk <- colSums(is.na(base1)) < dim(base1)[1]/3
+  # remove series with more than the indicated ratio of missing values (na.prop)
+  SerOk <- colSums(is.na(base1)) < (nrow(base1) * na.prop)
   base2 <- base1[, which(SerOk)]
   
-  if (sum(!SerOk)>0){
-  warning(paste(sum(!SerOk),'series ruled out due to lack in observations (more than 1/3 is NA).'))
+  if(sum(SerOk) == 1){
+    stop("the procedure can not be done with only one series available.")
   }
   
-  seriesdeletadas<-colnames(base1[, which(!SerOk)])
-  # if (sum(!SerOk)>0){
-  # warning(paste(seriesdeletadas,'was(were) ruled out due to lack in observations (more than 1/3 is NA).'))
-  # }
-  
-  
-  # substituir missings e outliers 
-  base3 <- base2*NA
-  if (sum(SerOk)==1){
-    base3<-outliers_correction(base2,k_ma)
-  } else if (sum(SerOk)>1){
-  for(i in 1:dim(base2)[2]){
-    base3[,i] <- outliers_correction(base2[,i],k_ma)
-  }
+  if(sum(!SerOk) > 0){
+    warning(paste(sum(!SerOk),'series ruled out due to lack in observations (more than', round(na.prop*100,2),'% NA).'))
   }
   
-  # nao substituir nas ultimas 12 linhas (por que as informações recentes são NA pelo timeless)
-  base4<-base2
-  if (sum(SerOk)==1){
-  base4[1:(length(base4)-12)] <- base3[1:(length(base4)-12)] 
-  } else if (sum(SerOk)>1){
-  base4[1:(nrow(base4)-12),] <- base3[1:(nrow(base4)-12),]
+  seriesdeletadas <- colnames(base1[, which(!SerOk)])
+  print(seriesdeletadas)
+  
+  
+  # replacing both missing values and outliers 
+  base3 <- base2 * NA
+  
+  for(i in 1:ncol(base2)){
+    # ignoring the last missing values
+    na <- is.na(base2[,i])
+    na2 <- NULL
+    for(j in 1:length(na)){
+      na2[j] <- ifelse(sum(na[j:length(na)]) == length(j:length(na)), 1, 0)
+    }
+    na_position <- min(which(na2 == 1)) - 1
+    if(length(which(na2 == 1)) == 0){ na_position <- nrow(base2)} 
+    base3[,i] <- c(outliers_correction(base2[1:na_position,i], k.ma), rep(NA, nrow(base2) - na_position))
   }
   
+  # add h lines to the database
+  base4 <- ts(rbind(base3, matrix(NA, nrow = h, ncol = ncol(base3))),
+            start = start(base3), frequency = 12)
   
-  base5<-ts(rbind(base4,matrix(NA, nrow = 12, ncol = dim(base4)[2]))
-     ,start=start(base4)
-     ,frequency = frequency(base4))
-  
-  
-  return(base5)
-  }
-  
+  # output
+  return(base4)
+}
+

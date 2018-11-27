@@ -1,60 +1,70 @@
 #' @importFrom stats cov end fitted lm median na.omit predict quantile sd start ts tsp window as.ts frequency
-#' @import zoo matlab corpcor
+#' @import zoo corpcor 
+#' @rawNamespace import(matlab, except = reshape)
+#' @importFrom lubridate quarter year month
 
-bridge <- function(y,x){
+bridge <- function(y, x, oldRegParam){
   
-  # y: ts (trimestral)
-  # x: fatores (mensais - output da função FactorExtraction)
+  # y: ts (quarterly or monthly)
+  # x: factors (monthly - output from FactorExtraction)
   
-  # tranformar fatores mensais em trimestrais, selecionando o último fator
-  # fatoresTS <- stats::ts(x[,-1], end = as.numeric(c(substr(x[nrow(x),1],1,4),
-  #                                                   substr(x[nrow(x),1],6,7))), frequency = 12)
+  if(!frequency(y) %in% c(4,12)){stop("y frequency must be 4 (quarterly) or 12 (monthly).")}
+  
   fatoresTS <- x
-  fatoresTRI <- month2qtr(fatoresTS)
   
+  if(frequency(y) == 4){
+    fatoresTRI <- month2qtr(fatoresTS)
+  }else{
+    fatoresTRI <- fatoresTS
+  }
   
-  # estimação do modelo de regressão
-  dados <- cbind(y, fatoresTRI)
+  # regression estimation
+  dados <- cbind(y, window(fatoresTRI, start = start(y), frequency = frequency(y)))
   colnames(dados) <- c("Y", paste0("Factor",1:ncol(data.frame(fatoresTRI))))
-  reg <- stats::lm(Y ~ ., data = na.omit(data.frame(dados)))
-  fit <- stats::ts(fitted(reg), end = end(na.omit(dados)), frequency = 4)
   
-  Qmax <- max(which(!is.na(dados[,1])))
-  edge<-zoo::as.Date(dados)[Qmax]
+  if(is.null(oldRegParam)){
+    reg <- stats::lm(Y ~ ., data = na.omit(data.frame(dados)))
+    fit <- stats::ts(fitted(reg), end = end(na.omit(dados)), frequency = frequency(y))
+    
+    Qmax <- max(which(!is.na(dados[,1])))
+    edge <- zoo::as.Date(dados)[Qmax]
+    
+    # forecast
+    newbase <- data.frame(dados[-(1:Qmax),-1])
+    colnames(newbase) <- paste0("Factor",1:ncol(data.frame(fatoresTRI)))
+    
+    if(frequency(y) == 4){
+      ano <- lubridate::year(edge + months(3))
+      tri <- lubridate::quarter(edge + months(3))
+    }else{
+      ano <- lubridate::year(edge + months(1))
+      tri <- lubridate::month(edge + months(1))
+    }
+    
+    prev <- stats::ts(stats::predict(object = reg, newdata = newbase),
+                      start = c(ano,tri),
+                      frequency = frequency(y)) 
+  }else{
+    X0 <-  as.matrix(cbind(1,na.omit(dados)[,-1]))
+    X1 <-  as.matrix(cbind(1,dados[is.na(dados[,1]),-1]))
+    
+    fit <- stats::ts(X0 %*% oldRegParam$coefficients, start = start(dados), frequency = frequency(y)) 
+    prev <- stats::ts(X1 %*% oldRegParam$coefficients, end = end(dados), frequency = frequency(y)) 
+    
+    reg <- NULL
+  }
   
-  # previsão
-  # newbase <- data.frame(dados[-(1:(Qmax-1)),-1])
-  newbase <- data.frame(dados[-(1:Qmax),-1])
-  colnames(newbase) <- paste0("Factor",1:ncol(data.frame(fatoresTRI)))
-  
-  ## função auxiliar
-  # tail.ts <- function(data,n) {
-  #   data <- as.ts(data)
-  #   window(data,start=tsp(data)[2]-(n-1)/frequency(data))
-  # }
-  
-  # ano<-as.numeric(substr(edge,1,4))
-  # tri<-as.numeric(substr(quarters(edge),2,2))
-  ano<-as.numeric(substr(edge+months(3),1,4))
-  tri<-as.numeric(substr(quarters(edge+months(3)),2,2))
-  
-  prev <- stats::ts(predict(object = reg, newdata = newbase),
-                    start = c(ano,tri),
-                    frequency = 4) 
-  
-  dados_pib<-cbind(y,fit,prev)
-  
+  dados_pib <- cbind(y, fit, prev)
   colnames(dados_pib) <- c("y", "in","out")
   
-  
-  # RETORNAR PREVISÃO DENTRO E FORA DA AMOSTRA
-  list(main = dados_pib,reg = reg)
+  # output
+  return(list(main = dados_pib, reg = reg))
 }
 
 FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL, 
                              A = NULL,C = NULL,Q = NULL,R = NULL,
                              initx = NULL, initV = NULL,
-                             ss = NULL, MM = NULL, n.prevs = NULL){
+                             ss = NULL, MM = NULL, a = NULL, n.prevs = NULL){
   
   # The model
   # x_t = C F_t + \xi_t
@@ -80,14 +90,7 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   # A = NULL; C = NULL; Q = NULL;R = NULL;
   # initx = NULL; initV = NULL; ss = NULL; MM = NULL
   
-  #finalx <- x
-  #x <- finalx[,1:(ncol(finalx)-1)]
-  
-  # coluna1 <- x[,1]
-  # x <- x[,-1]
-  
-  datas<-zoo::as.Date(x)
-  # x<-data.frame(x)
+  datas <- zoo::as.Date(x)
   
   # Base dimension
   TT <- nrow(x)
@@ -101,16 +104,16 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   n.arg <- sum(c(!is.null(x),!is.null(q),!is.null(r),!is.null(p),
                  !is.null(A),!is.null(C),!is.null(Q),!is.null(R),
                  !is.null(initx), !is.null(initV), 
-                 !is.null(ss), !is.null(MM)))
+                 !is.null(ss), !is.null(MM), !is.null(a)))
   
   if(n.arg < 5){ # Estimate parameters if they are not inputed
     
     z <- x[1:(TT - m),]      # ONLY complete information for PCA
-    s <- apply(z, MARGIN = 2, FUN = sd)
-    M <- apply(z, MARGIN = 2, FUN = mean)
+    ss <- apply(z, MARGIN = 2, FUN = sd)
+    MM <- apply(z, MARGIN = 2, FUN = mean)
     
     for(i in 1:N){
-      x[,i] <- (x[,i] - M[i])/s[i]
+      x[,i] <- (x[,i] - MM[i]) / ss[i]
     }
     z <- x[1:(TT - m),]
     
@@ -123,7 +126,7 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
     initx <- parametros$initx
     initV <- parametros$initV
     a <- parametros$eigen
-    #print(A)
+    
   }else{
     
     # If parameters are inputed only need to standardize
@@ -169,15 +172,18 @@ FactorExtraction <- function(x = NULL,q = NULL,r = NULL,p = NULL,
   fator_final <- data.frame(datas, fatores)
   colnames(fator_final) <- nomes_colunas
   
-  x<-fator_final
-  fatoresTS <- stats::ts(x[,-1], end=as.numeric(c(substr(datas[length(datas)],1,4),
-                                                  substr(datas[length(datas)],6,7)))
-                         ,frequency = 12)
+  fatoresTS <- stats::ts(fator_final[,-1], 
+                         end = c(lubridate::year(max(datas)), lubridate::month(max(datas))),
+                         frequency = 12)
   
   if(p > 1){
     fatoresTS <- fatoresTS[,1:r]
   }
-  list(dynamic_factors = fatoresTS,A = A,C = C,Q = Q,R =  R,initx =  initx,initV =  initV,eigen = a)
+  
+  # output
+  return(list(dynamic_factors = fatoresTS, A = A, C = C, Q = Q, R =  R,
+              initx =  initx, initV =  initV,
+              eigen = a, ss = ss, MM = MM))
 }
 
 
@@ -273,7 +279,8 @@ kalman_filter_diag <- function(y, A, C, Q, R, init_x, init_V, varagin){
     loglik <- loglik + LL[t]
   }
   
-  list(x = x, V = V, VV = VV, loglik = loglik)
+  # output
+  return(list(x = x, V = V, VV = VV, loglik = loglik))
   
   
 }
@@ -348,7 +355,8 @@ kalman_smoother_diag <- function(y, A, C, Q, R, init_x, init_V, varagin){
   
   VVsmooth[,,1] <- zeros(ss,ss)
   
-  list(xsmooth = xsmooth, Vsmooth = Vsmooth, VVsmooth = VVsmooth, loglik = loglik)
+  # output
+  return(list(xsmooth = xsmooth, Vsmooth = Vsmooth, VVsmooth = VVsmooth, loglik = loglik))
 }
 
 kalman_update_diag <- function(A, C, Q, R, y, x, V, varagin){
@@ -425,84 +433,52 @@ kalman_update_diag <- function(A, C, Q, R, y, x, V, varagin){
   Vnew <- (eye(ss) - K %*% C) %*% Vpred    #P(t\t) formula 13.2.16 hamilton
   VVnew <- (eye(ss) - K %*% C) %*% A %*% V
   
-  list(xnew = xnew, Vnew = Vnew, VVnew = VVnew, loglik = loglik)          
+  # output
+  return(list(xnew = xnew, Vnew = Vnew, VVnew = VVnew, loglik = loglik))          
   
 }
 
-outliers_correction <- function(x, k_ma = 3){
-  # x é um série temporal
+outliers_correction <- function(x, k.ma = 3){
+  # x: ts
   
   # encontrar missings
   missing <- is.na(x)
   
-  # Função criada no R para superar os problemas da função do matlab
-  # outlier são as obs que ultrapassam 4* distância interquartilica
-  outlier <- abs(x - median(x, na.rm = T)) > 4*abs(quantile(x, probs = 0.25, na.rm = T) -  quantile(x, probs = 0.75, na.rm = T)) & !missing
-  
-  ### Problema 2: Usa NA para calcular o tamanho do vetor
-  # TT <- length(x)   # problem 1
-  # TT <- sum(!is.na(x))   # Solução: utilizar apenas as observações completas
-  
-  ### Problema 3: utilizar a função round do matlab gera viés
-  # round2 = function(x, n) {
-  #   posneg = sign(x)
-  #   z = abs(x)*10^n
-  #   z = z + 0.5
-  #   z = trunc(z)
-  #   z = z/10^n
-  #   z*posneg
-  # }
-  # outlier <- abs(x - sort(x)[round2(TT*1/2,0)]) > 4*abs(sort(x)[round2(TT*1/4,0)] -  sort(x)[round2(TT*3/4,0)]) & !missing
-  # possível solução: utilizar a função round do R que controla pelo viés.
+  # outlier is an observation greater than 4 times interquartile range
+  outlier <- abs(x - median(x, na.rm = T)) > (4 * stats::IQR(x, na.rm = T)) & !missing
   
   Z <- x
   
-  # substituir outliers e missings pela mediana
+  # replacing outliers and missings by median
   Z[outlier] <- median(x, na.rm = T)
   Z[missing] <- median(x, na.rm = T)
-  # Z[outlier] <- sort(x)[round2(TT*1/2,0)]
-  # Z[missing] <- sort(x)[round2(TT*1/2,0)]
   
-  # Média móvel de ordem K
-  xpad <- c(Z[1]*ones(k_ma,1), Z, Z[length(Z)]*ones(k_ma,1))
+  # centred moving average length k.ma
+  xpad <- c(Z[1]*ones(k.ma,1), Z, Z[length(Z)]*ones(k.ma,1))
   x_ma <- xpad*NA
-  for(j in (k_ma + 1):(length(xpad) - k_ma)){
-    x_ma[j - k_ma] = mean(xpad[(j - k_ma):(j + k_ma)])
+  for(j in (k.ma + 1):(length(xpad) - k.ma)){
+    x_ma[j - k.ma] <- mean(xpad[(j - k.ma):(j + k.ma)])
   }
   x_ma <- x_ma[1:length(x)]
   
   Z[outlier] <- x_ma[outlier]
   Z[missing] <- x_ma[missing]
   
-  Z
+  # output
+  return(Z)
 }
 
 pcatodfm <- function(x, q, r, p){
   
-  # x é a base de dados em formato ts
-  # q é o número de choques nos fatores
-  # r é a quantidade de fatores
-  # p é o grau do polinômio autorregressivo
-  # x = x_padronizado
-  # r = 2
-  # q = 2
-  # p = 1
+  # x: database ts
   
-  # finalx2 = z
-  # x = z
   x <- as.matrix(x)
-  Mx <- colMeans(x)
-  Wx <- apply(x, MARGIN = 2, FUN = sd)
   
-  for(i in 1:ncol(x)){
-    x[,i] <- (x[,i] - Mx[i])/Wx[i]
-  }
-  
-  # tamanho da base
+  # size
   TT <- nrow(x)
   N <- ncol(x)
   
-  # restrição
+  # restriction
   if(r < q){ stop("q must be less than or equal to r") }
   
   # nlag 
@@ -587,7 +563,7 @@ pcatodfm <- function(x, q, r, p){
     }
     
     initx <- t(Z[1,]) 
-    initV <- matlab::reshape(corpcor::pseudoinverse(eye(size(kronecker(A,A),1))- kronecker(A,A)) %*% matrix(Q, ncol = 1), r*p, r*p)
+    initV <- matrix(corpcor::pseudoinverse(eye(size(kronecker(A,A),1))- kronecker(A,A)) %*% matrix(Q, ncol = 1), r*p, r*p)
     
   }else{
     
@@ -602,7 +578,8 @@ pcatodfm <- function(x, q, r, p){
     C <- as.matrix(v)
   }
   
-  list(A = A, C = C, Q = Q, R = R, initx = initx, initV = initV, eigen = a1)
+  # output
+  return(list(A = A, C = C, Q = Q, R = R, initx = initx, initV = initV, eigen = a1))
 }
 
 smooth_update <- function(xsmooth_future, Vsmooth_future, xfilt, Vfilt,  Vfilt_future, VVfilt_future, A, Q, B, u){
@@ -635,7 +612,8 @@ smooth_update <- function(xsmooth_future, Vsmooth_future, xfilt, Vfilt,  Vfilt_f
     VVsmooth_future <- VVfilt_future + (Vsmooth_future - Vfilt_future) %*% corpcor::pseudoinverse(Vfilt_future) %*% VVfilt_future
   }else{
     VVsmooth_future <- VVfilt_future + (Vsmooth_future - Vfilt_future) %*% 1/Vfilt_future %*% VVfilt_future
-    
   }
-  list(xsmooth = xsmooth, Vsmooth = Vsmooth, VVsmooth_future = VVsmooth_future)
+  
+  # output
+  return(list(xsmooth = xsmooth, Vsmooth = Vsmooth, VVsmooth_future = VVsmooth_future))
 }

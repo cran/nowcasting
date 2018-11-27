@@ -16,8 +16,7 @@
 #' RTDB(series_code = 1, vintage = "2017-04-04")
 #' }
 #' @references Central Bank of Brazil
-#' @export
-
+# #' @export
 
 RTDB <- function(series_code = NULL, vintage = NULL){
 
