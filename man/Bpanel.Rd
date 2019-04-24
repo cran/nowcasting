@@ -4,8 +4,8 @@
 \alias{Bpanel}
 \title{Balanced panel}
 \usage{
-Bpanel(base = NULL, trans = NULL, aggregate = F, k.ma = 3,
-  na.prop = 1/3, h = 12)
+Bpanel(base = NULL, trans = NULL, NA.replace = T, aggregate = F,
+  k.ma = 3, na.prop = 1/3, h = 12)
 }
 \arguments{
 \item{base}{A \code{mts} with the series to be transformed.}
@@ -38,6 +38,8 @@ Bpanel(base = NULL, trans = NULL, aggregate = F, k.ma = 3,
   
   \deqn{\frac{x_{i,t} - x_{i,t-12}}{x_{i,t-12}}}}
  }}
+
+\item{NA.replace}{A \code{boolean} indicating whether missing values, not part of the jagged edges, should be replaced.}
 
 \item{aggregate}{A \code{boolean} representing if you want aggregate the monthly variables to represent quarterly quantities. If \code{TRUE} the aggregation is made following the approximation of \emph{Mariano and Murasawsa 2003}.}
 

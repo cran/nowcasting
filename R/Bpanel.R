@@ -33,6 +33,7 @@
 #'   \deqn{\frac{x_{i,t} - x_{i,t-12}}{x_{i,t-12}}}}
 #'  } 
 #' 
+#' @param NA.replace A \code{boolean} indicating whether missing values, not part of the jagged edges, should be replaced.
 #' @param aggregate A \code{boolean} representing if you want aggregate the monthly variables to represent quarterly quantities. If \code{TRUE} the aggregation is made following the approximation of \emph{Mariano and Murasawsa 2003}.
 #' @param k.ma A \code{numeric} representing the degree of the moving average correction.
 #' @param na.prop A \code{numeric} representing the proportion of NA allowed. Default is 1/3.
@@ -49,7 +50,7 @@
 #' @export
 
 
-Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k.ma = 3, na.prop = 1/3, h = 12){
+Bpanel <- function(base = NULL, trans = NULL, NA.replace = T, aggregate = F, k.ma = 3, na.prop = 1/3, h = 12){
   
   if(is.null(trans)){
     stop('trans can not to be NULL')
@@ -67,7 +68,7 @@ Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k.ma = 3, na.prop =
     stop('the only available transformations are 0, 1, 2, 3, 4, 5 and 6.')
   }
   
-  if(na.prop <= 0 | na.prop >= 1){
+  if(na.prop < 0 | na.prop > 1){
     stop("na.prop must be between 0 and 1.")
   }
   
@@ -91,24 +92,17 @@ Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k.ma = 3, na.prop =
       temp <- diff(base[,j],12)
       base1[-c(1:12),j] <- temp  
     }else if(trans[j] == 6){ # yearly rate of change
-      temp <- base[,j] / stats::lag(base[,j],-12)
+      temp <- diff(base[,j], 12) / stats::lag(base[,j],-12)
       base1[-c(1:12),j] <- temp  
     }else if(trans[j] == 0){ # no transformation
       base1[,j] <- base[,j]
     }
   }
   
-  # transformation of monthly series into quarterly quantities
+  # transformation of monthly series based on Mariano and Murasawa (2003)
   if(aggregate == T){
     for(j in 1:ncol(base)){
-      if(trans[j] %in% c(1,2,3,4)){
-        # transformation of monthly differences/rates based on Mariano and Murasawa (2003)
         base1[,j] <- stats::filter(base1[,j], c(1,2,3,2,1), sides = 1)
-      }
-      else if(trans[j] %in% c(5,6)){
-        # transformation of yearly difference/rate
-        base1[,j] <- stats::filter(base1[,j], c(1,1,1), sides = 1)
-      }
     }
   }
   colnames(base1) <- colnames(base)
@@ -139,9 +133,9 @@ Bpanel <- function(base = NULL, trans = NULL, aggregate = F, k.ma = 3, na.prop =
     for(j in 1:length(na)){
       na2[j] <- ifelse(sum(na[j:length(na)]) == length(j:length(na)), 1, 0)
     }
-    na_position <- min(which(na2 == 1)) - 1
+    suppressWarnings({ na_position <- min(which(na2 == 1)) - 1 })
     if(length(which(na2 == 1)) == 0){ na_position <- nrow(base2)} 
-    base3[,i] <- c(outliers_correction(base2[1:na_position,i], k.ma), rep(NA, nrow(base2) - na_position))
+    base3[,i] <- c(outliers_correction(base2[1:na_position,i], k.ma, NA.replace), rep(NA, nrow(base2) - na_position))
   }
   
   # add h lines to the database
