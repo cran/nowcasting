@@ -4,30 +4,25 @@
 \alias{nowcast}
 \title{Nowcasting of a quarterly time series using a dynamic factor model.}
 \usage{
-nowcast(y, x, q = NULL, r = NULL, p = NULL, method = "2s",
-  blocks = NULL, frequency = NULL, oldFactorsParam = NULL,
-  oldRegParam = NULL)
+nowcast(formula, data, r = NULL, q = NULL, p = NULL, method = "EM",
+  blocks = NULL, frequency = NULL)
 }
 \arguments{
-\item{y}{Stationary quarterly time series.}
+\item{formula}{An object of class "formula": a symbolic description of the model to be fitted.}
 
-\item{x}{A monthly time series matrix (\code{mts}) representing regressors variables. The series must be stationary.}
-
-\item{q}{Dynamic rank. Number of error terms.}
+\item{data}{A monthly time series matrix (\code{mts}) of stationary variables.}
 
 \item{r}{number of commom factors.}
+
+\item{q}{Dynamic rank. Number of error terms.}
 
 \item{p}{AR order of factor model.}
 
 \item{method}{There are three options: \code{"2s"} (two stages without factors aggregation as in Giannone et al. 2008); \code{"2s_agg"} (two stages with factors aggregation); \code{"EM"} (Expected Maximization as in Bańbura et al. 2011).}
 
-\item{blocks}{a binary matrix Nx3 that characterizes the regressors variables in global (1st column), nominal (2nd column) and real (3rd column). If \code{NULL}, the matrix assume 1 for all cells.}
+\item{blocks}{a matrix that defines the variables loaded into the factors.}
 
 \item{frequency}{A vector of integers indicating the frequency of the variables: 4 for quarterly, 12 for monthly.}
-
-\item{oldFactorsParam}{a list containing estimated factors parameters from nowcast function.}
-
-\item{oldRegParam}{a list containing estimated regression parameters from nowcast function.}
 }
 \value{
 A \code{list} containing two elements:
@@ -35,40 +30,44 @@ A \code{list} containing two elements:
 \item{reg}{regression model between \code{y} and the estimated factors. Not available for EM method.}
 \item{factors}{the estimated factors and DFM model coefficients.}
 \item{xfcst}{the original regressors and their out-of-sample estimations.}
-\item{month_y}{the monthly measure for quarterly \code{y} variable. Only available for EM method.}
 }
 \description{
-Estimate nowcasting and forecasting for a quarterly series. For more details read the Vignettes.
+Estimate nowcasting and forecasting models for quarterly or monthly time series. For more details read the Vignettes.
 }
 \examples{
 \dontrun{
-### Method 2s (without aggregation)
-gdp <- month2qtr(x = USGDP$base[,"RGDPGR"])
+### Method 2s (Using the Mariano and Murasawa aggregation method on the variables)
+data(USGDP)
 gdp_position <- which(colnames(USGDP$base) == "RGDPGR")
 base <- Bpanel(base = USGDP$base[,-gdp_position],
                trans = USGDP$legend$Transformation[-gdp_position],
                aggregate = TRUE)
-now2s <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2s')
+data <- cbind(USGDP$base[,"RGDPGR"], base)
+colnames(data) <- c("RGDPGR", colnames(base))
+frequency <- c(4, rep(12, ncol(data) -1))
+now2s <- nowcast(formula = RGDPGR ~ ., data = data, r = 2, p = 2, q = 2,
+                 method = '2s', frequency = frequency)
 
-### Method 2s_agg (with aggregation)
-base <- Bpanel(base = USGDP$base[,-gdp_position],
-               trans = USGDP$legend$Transformation[-gdp_position],
+
+### Method 2s_agg (Using the Mariano and Murasawa aggregation method on the factors)
+data <- Bpanel(base = USGDP$base,
+               trans = USGDP$legend$Transformation,
                aggregate = FALSE)
-now2s_agg <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2s_agg')
+frequency <- c(rep(12, ncol(data) -1), 4)
+now2s_agg <- nowcast(formula = RGDPGR ~ ., data = data, r = 2, p = 2, q = 2, 
+                     method = '2s_agg', frequency = frequency)
+
 
 ### Method EM
 # Replication of the NY FED nowcast
 data(NYFED)
-
 base <- NYFED$base
 blocks <- NYFED$blocks$blocks
 trans <- NYFED$legend$Transformation
 frequency <- NYFED$legend$Frequency
-
-x <- Bpanel(base = base, trans = trans, NA.replace = F, na.prop = 1)
-
-nowEM <- nowcast(y = "GDPC1", x = x, r = 1, p = 1, method = "EM",
- blocks = blocks, frequency = frequency)
+data <- Bpanel(base = base, trans = trans, NA.replace = F, na.prop = 1)
+nowEM <- nowcast(formula = GDPC1 ~ ., data = data, r = 1, p = 1, 
+                 method = "EM", blocks = blocks, frequency = frequency)
 
 }
 }

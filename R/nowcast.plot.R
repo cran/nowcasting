@@ -1,30 +1,20 @@
 #' @title Plot for the nowcast output function
 #' @description Make plots to visualize the output of the nowcast function
 #' @param out output of the nowcast function.
-#' @param type 'fcst', 'factors', 'eigenvalues','eigenvectors' or 'month_y'. The latter is only available for the EM method, while 'eigenvalues' and 'eigenvectors' are only available for the two stages methods.
+#' @param type 'fcst', 'factors', 'eigenvalues' or 'eigenvectors'. The 'eigenvalues' and 'eigenvectors' options are only available for the two stages methods.
 #' @examples
 #' \dontrun{
-#' gdp <- month2qtr(x = USGDP$base[,"RGDPGR"])
-#' gdp_position <- which(colnames(USGDP$base) == "RGDPGR")
-#' base <- Bpanel(base = USGDP$base[,-gdp_position],
-#'                trans = USGDP$legend$Transformation[-gdp_position],
-#'                aggregate = TRUE)
-#' now2sq <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2s')
-#' 
-#' nowcast.plot(now2sq, type = "fcst")
-#' nowcast.plot(now2sq, type = "factors")
-#' nowcast.plot(now2sq, type = "eigenvalues")
-#' nowcast.plot(now2sq, type = "eigenvectors")
-#' 
-#' base <- Bpanel(base = USGDP$base[,-gdp_position],
-#'                trans = USGDP$legend$Transformation[-gdp_position],
+#' data <- Bpanel(base = USGDP$base,
+#'                trans = USGDP$legend$Transformation,
 #'                aggregate = FALSE)
-#' now2sm <- nowcast(y = gdp, x = base, r = 2, p = 2, q = 2, method = '2s_agg')
+#' frequency <- c(rep(12, ncol(data) -1), 4)
+#' now2s_agg <- nowcast(formula = RGDPGR ~ ., data = data, r = 2, p = 2, q = 2, 
+#'                      method = '2s_agg', frequency = frequency)
 #' 
-#' nowcast.plot(now2sm, type = "fcst")
-#' nowcast.plot(now2sm, type = "factors")
-#' nowcast.plot(now2sm, type = "eigenvalues")
-#' nowcast.plot(now2sm, type = "eigenvectors")
+#' nowcast.plot(now2s_agg, type = "fcst")
+#' nowcast.plot(now2s_agg, type = "factors")
+#' nowcast.plot(now2s_agg, type = "eigenvalues")
+#' nowcast.plot(now2s_agg, type = "eigenvectors")
 #' }
 #' @export
 
@@ -102,41 +92,6 @@ nowcast.plot <- function(out, type = "fcst"){
     add_legend("topright", legend = leg, bty = "n",
            col = c(1,"orangered","blue"), lty = c(1,2,3), lwd = c(1,1,1,2,2,2), cex = 0.9)
     
-  }else if(type == 'month_y'){
-    
-    if("reg" %in% names(out)){
-      stop("Graph not available for '2sq' and '2sm' methods")
-    }
-    
-    Y<-stats::ts(rep(out$yfcst[,1],each=3),end=end(qtr2month(out$yfcst[,1])),frequency = 12)
-    YY<-cbind(out$month_y,Y)
-    ## add extra space to right margin of plot within frame
-    graphics::par(mar=c(5, 4, 4, 5.7) + 0.1,xpd=F)
-    ## Plot first set of data and draw its axis
-    graphics::plot(zoo::as.Date(YY), YY[,2], type='l', axes=FALSE, xlab="", ylab="", 
-         col="black",lty=1,
-         ylim = c(0-1.1*max(abs(range(YY[,2],na.rm = T))),0+1.1*max(abs(range(YY[,2],na.rm = T)))))
-    graphics::axis(2, ylim=c(0,1),col="black",las=1)  ## las=1 makes horizontal labels
-    graphics::mtext("y unit",side=2,line=2.5)
-    # graphics::box()
-    ## Allow a second plot on the same graph
-    graphics::par(new=TRUE,xpd=F)
-    ## Plot the second plot and put axis scale on right
-    graphics::plot(zoo::as.Date(YY), YY[,1], xlab="", ylab="",
-         axes=FALSE, type="l", col="orangered",lty=2,
-         ylim = c(0-1.1*max(abs(range(YY[,1],na.rm = T))),0+1.1*max(abs(range(YY[,1],na.rm = T)))))
-    ## a little farther out (line=4) to make room for labels
-    graphics::mtext("monthly y unit",side=4,col="orangered",line=4)
-    graphics::axis(4, ylim=c(0,1), col="orangered",col.axis="orangered",las=1)
-    ## Draw the time axis
-    graphics::axis(1,at = zoo::as.Date(YY)[seq(1,length(zoo::as.Date(YY)),by = 10)],labels = zoo::as.Date(YY)[seq(1,length(zoo::as.Date(YY)),by = 10)],las=1)
-    graphics::mtext("Time",side=1,col="black",line=2.5)  
-    ## Add Legend
-    graphics::grid(col = "#D9D9D9")
-    graphics::par(xpd = T)
-    graphics::legend("topright",legend=c("y","monthly y"),inset=-0.17,
-           text.col=c("black","orangered"),lty=c(1,2),col=c("black","red"),cex = 0.9,bty="n")
-    graphics::title(main = list("Monthly Dependent Variable", font = 1, cex = 0.9))
   }
 }
 
