@@ -164,13 +164,17 @@ nowcast <- function(formula, data, r = NULL, q = NULL, p = NULL, method = 'EM', 
     if(!is.matrix(blocks)){blocks <- as.matrix(blocks)}
     
     # determine the number of blocks
+    blocks <- as.matrix(blocks) # variables should be rows, columns the blocks
     n_blocks <- dim(blocks)[2]
     
     x <- ts(model.frame(formula, data, na.action = NULL), start = start(data), frequency = frequency(data))
     
     # new frequency
     new_frequency <- c(frequency[y_position], frequency[-y_position])
-    blocks <- rbind(blocks[y_position,],blocks[-y_position,])
+    
+    # reshuffling the blocks
+    blocks <- rbind(matrix(blocks[y_position,],ncol = n_blocks),matrix(blocks[-y_position,], ncol = n_blocks))
+    
     # determine the number of quarterly series
     nQ <- sum(new_frequency==4)
     
@@ -223,23 +227,57 @@ nowcast <- function(formula, data, r = NULL, q = NULL, p = NULL, method = 'EM', 
       for(j in 1:length(idx_factor_aux)){idx_factor <- append(idx_factor, idx_factor_aux[[j]])}
     }
     
-    # Factors and estimated parameters
+    # Factors and estimated explanatory variables
     factors <- list(dynamic_factors = ts(Res$FF[,idx_factor], start = start(x), frequency = 12))
     colnames(factors$dynamic_factors) <- as.vector(sapply(X = 1:dim(blocks)[2],FUN = function(X){paste0("Block",X,"_factor",1:r)}))
     
     fore_x <- ts(Res$X_sm, start = start(x), frequency = 12)
     colnames(fore_x) <- colnames(x)
     
+    # in-sample and out of sample forecasts of y
+    
+      # index for selecting the columns in the factor loadings matrix and the factor matrix 
+      idx_aux <- NULL
+      if(nQ==0){
+        idx_aux <- idx_factor 
+      }else if(nQ!=0 && r==1){
+        idx_aux <- sort(as.vector(sapply(0:4, FUN = function(x){idx_factor+x})))
+      }else{
+        idx_aux <- sort(as.vector(sapply(0:4, FUN = function(x){idx_factor+x*r})))
+      }
+    
+      # restricted vector of loadings (takes into account the aggregation from Mariano and Murasawa 2003 if the variable is quarterly)
+      restricted_loadings <- Res$C[y_pos,idx_aux]
+      
+      # forecast of normalized series
+      y_hat <- Res$FF[,idx_aux]%*%restricted_loadings
+      
+      # undo normalization
+      y_hat <- y_hat*Res$Wx[y_pos]
+      y_hat <- Res$Mx[y_pos]+y_hat
+      
+      # in-sample and out-of-sample
+      y_hat[is.na(x[,y_pos])] <- 0
+      y_hat_out <- Res$X_sm[,y_pos]
+      y_hat_out[!is.na(x[,y_pos])] <- 0
+      
+      
     # y monthly
     if(new_frequency[idx_new[y_pos]]==12){
-      yprev <- ts(Res$X_sm[,y_pos], start = start(x), frequency = 12)
+      
+      # combine both in-sample and out-of-sample
+      yprev <- ts(y_hat+y_hat_out, start = start(x), frequency = 12)
       y <- x[,y_pos]
+      
     }
     
     # y quarterly
     if(new_frequency[idx_new[y_pos]]==4){
-      yprev <- month2qtr(ts(Res$X_sm[,y_pos], start = start(x), frequency = 12))
+      
+      # combine both in-sample and out-of-sample
+      yprev <- month2qtr(ts(y_hat+y_hat_out, start = start(x), frequency = 12))
       y <- month2qtr(x[,y_pos])
+      
     }
     
     # Observed and forecast y
