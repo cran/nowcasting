@@ -1,9 +1,9 @@
 Package: nowcasting
 Type: Package
 Title: Predicting Economic Variables using Dynamic Factor Models
-Version: 1.1.3
+Version: 1.1.4
 Depends: R (>= 3.4.0)
-Date: 2019-06-05
+Date: 2019-07-31
 Authors@R: c( person("Daiane", "Marcolino de Mattos", email = "daiane.mattos@fgv.br",role=c("aut","cre")),
               person("Pedro","Costa Ferreira",email = "pedro.guilherme@fgv.br",role=c("aut")),
               person("Serge","de Valk",email = "serge.valk@fgv.br",role=c("aut")),
@@ -21,10 +21,10 @@ NeedsCompilation: no
 Suggests: knitr, rmarkdown
 Imports: corpcor, httr, lubridate, matlab, RCurl, xts, zoo, DBI, magic,
         RMySQL, Matrix, vars, stats
-Packaged: 2019-06-05 10:09:53 UTC; daiane
+Packaged: 2019-08-01 01:35:55 UTC; daiane
 Author: Daiane Marcolino de Mattos [aut, cre],
   Pedro Costa Ferreira [aut],
   Serge de Valk [aut],
   Guilherme Branco Gomes [aut]
 Repository: CRAN
-Date/Publication: 2019-06-12 07:20:03 UTC
+Date/Publication: 2019-08-01 05:00:02 UTC
